@@ -1,0 +1,79 @@
+/* Modo Escuro Geral */
+body.dark-mode {
+    background-color: #121212;
+    color: #ffffff;
+}
+
+/* Navbar no modo escuro */
+.dark-mode .navbar {
+    background-color: #1f1f1f;
+}
+
+/* Botões no modo escuro */
+.dark-mode .btn {
+    background-color: #424242;
+    color: #ffffff;
+}
+
+/* Contêineres e Linhas */
+.dark-mode .container-fluid,
+.dark-mode .row,
+.dark-mode .col-md-3,
+.dark-mode .col-md-6,
+.dark-mode .col-md-8,
+.dark-mode .col-md-4 {
+    background-color: #121212;
+}
+
+/* Títulos e Textos */
+.dark-mode h1,
+.dark-mode h4,
+.dark-mode .card-title,
+.dark-mode .card-text,
+.dark-mode p {
+    color: #ffffff;
+}
+
+/* Cartões */
+.dark-mode .card {
+    background-color: #1f1f1f;
+    color: #ffffff;
+    border-color: #424242;
+}
+
+/* Sobrescrever cores de fundo dos cards */
+.dark-mode .bg-success {
+    background-color: #2e7d32 !important;  /* Verde escuro */
+}
+
+.dark-mode .bg-danger {
+    background-color: #c62828 !important;  /* Vermelho escuro */
+}
+
+/* Lista de Clientes */
+.dark-mode .list-group-item {
+    background-color: #1f1f1f;
+    color: #ffffff;
+    border-color: #424242;
+}
+
+/* Itens Offline Piscando */
+.offline {
+    background-color: #c62828;  /* Vermelho escuro */
+    color: #ffffff;
+}
+
+.blinking {
+    animation: blinking 1s infinite;
+}
+
+@keyframes blinking {
+    0% { background-color: #c62828; }
+    50% { background-color: #1f1f1f; }
+    100% { background-color: #c62828; }
+}
+
+/* Mapa */
+.dark-mode .leaflet-container {
+    background: #1f1f1f;
+}
