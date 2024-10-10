@@ -4,6 +4,7 @@ import base64
 import json
 import time
 import urllib3
+import uuid 
 
 # Desabilitar avisos de requisições inseguras (se necessário)
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -34,7 +35,7 @@ headers = {
 
 # Configurações do Telegram
 telegram_bot_token = '6644963671:AAHgK96UoirMdoExb4EzPsbaJLmWQyi76gU'  # Substitua pelo token do seu bot
-telegram_chat_id = '-1001744400927'  # Substitua pelo ID do chat ou grupo
+telegram_chat_id = '-4593383369'  # Substitua pelo ID do chat ou grupo
 
 # Parâmetros de configuração
 MAX_CLIENTS_IN_MESSAGE = 50       # Máximo de clientes a listar na mensagem
@@ -137,12 +138,12 @@ def obter_clientes_online():
 
             # Extrair os campos desejados de cada registro
             for registro in registros:
-                cliente_info = {
-                    'login': registro.get('login'),
-                    'conexao': registro.get('conexao'),
-                    'ultima_conexao_final': registro.get('ultima_conexao_final')
-                }
-                clientes_online.append(cliente_info)
+                    cliente_info = {
+                        'login': registro.get('login'),
+                        'conexao': registro.get('conexao'),
+                        'ultima_conexao_final': registro.get('ultima_conexao_final')
+                    }
+                    clientes_online.append(cliente_info)
 
             logging.info(f"Página {page}: Obtidos {len(registros)} registros de clientes online.")
 
@@ -160,35 +161,33 @@ def obter_clientes_online():
     logging.info(f"Total de clientes online obtidos: {len(clientes_online)}")
     return clientes_online
 
-def enviar_alerta_telegram(clientes, status):
+def enviar_alerta_telegram(clientes, status, conexao, mensagem_personalizada=None):
     total_clientes = len(clientes)
     if total_clientes == 0:
         return
 
-    if status == 'offline':
-        mensagem = f"🚨 *Alerta: {total_clientes} novos clientes offline detectados.*\n"
+    if mensagem_personalizada:
+        mensagem = mensagem_personalizada + "\n"
+    elif status == 'offline':
+        mensagem = f"🚨 *Alerta: {total_clientes} clientes offline detectados na conexão {conexao}.*\n"
     elif status == 'online':
-        mensagem = f"✅ *Alerta: {total_clientes} clientes voltaram a ficar online.*\n"
+        mensagem = f"✅ *Alerta: Todos os clientes voltaram a ficar online na conexão {conexao}.*\n"
     else:
-        mensagem = f"*Alerta: {total_clientes} clientes com status desconhecido.*\n"
+        mensagem = f"*Alerta: {total_clientes} clientes com status desconhecido na conexão {conexao}.*\n"
 
     # Listar até MAX_CLIENTS_IN_MESSAGE clientes
     if total_clientes <= MAX_CLIENTS_IN_MESSAGE:
         for cliente in clientes:
             login = cliente.get('login', 'N/A')
-            conexao = cliente.get('conexao', 'N/A')
             ultima_conexao_final = cliente.get('ultima_conexao_final', 'N/A')
             mensagem += f"- *Login:* `{login}`\n"
-            mensagem += f"  *Conexão:* {conexao}\n"
             mensagem += f"  *Última conexão:* {ultima_conexao_final}\n"
     else:
         mensagem += "Listando alguns clientes:\n"
         for cliente in clientes[:MAX_CLIENTS_IN_MESSAGE]:
             login = cliente.get('login', 'N/A')
-            conexao = cliente.get('conexao', 'N/A')
             ultima_conexao_final = cliente.get('ultima_conexao_final', 'N/A')
             mensagem += f"- *Login:* `{login}`\n"
-            mensagem += f"  *Conexão:* {conexao}\n"
             mensagem += f"  *Última conexão:* {ultima_conexao_final}\n"
         mensagem += f"... e mais {total_clientes - MAX_CLIENTS_IN_MESSAGE} clientes."
 
@@ -208,6 +207,7 @@ def enviar_alerta_telegram(clientes, status):
 def monitorar_conexoes():
     clientes_offline_anterior = set()
     clientes_info_offline_anterior = {}
+    eventos_ativos = []  # Lista de eventos ativos
     try:
         while True:
             logging.info("Iniciando verificação de clientes.")
@@ -239,20 +239,59 @@ def monitorar_conexoes():
                 # Identifica clientes que voltaram a ficar online
                 clientes_reconectados = clientes_offline_anterior - clientes_offline_atual
 
+                # Processar novos clientes offline
                 if novos_offlines:
                     logging.warning(f"Detectados {len(novos_offlines)} novos clientes offline.")
-                    novos_clientes_info = [clientes_info_offline_atual[login] for login in novos_offlines]
-                    if len(novos_offlines) >= THRESHOLD_OFFLINE_CLIENTS:
-                        enviar_alerta_telegram(novos_clientes_info, status='offline')
-                    else:
-                        logging.info(f"Número de novos clientes offline ({len(novos_offlines)}) abaixo do limite de alerta.")
+
+                    # Agrupar novos offlines por 'conexao'
+                    conexoes_novos_offlines = {}
+                    for login in novos_offlines:
+                        cliente = clientes_info_offline_atual[login]
+                        conexao = cliente.get('conexao', 'Desconhecida')
+                        if conexao not in conexoes_novos_offlines:
+                            conexoes_novos_offlines[conexao] = []
+                        conexoes_novos_offlines[conexao].append(cliente)
+
+                    # Criar eventos separados para cada 'conexao' que atendem ao threshold
+                    for conexao, clientes in conexoes_novos_offlines.items():
+                        if len(clientes) >= THRESHOLD_OFFLINE_CLIENTS:
+                            # Criar novo evento
+                            evento = {
+                                'id': str(uuid.uuid4()),
+                                'conexao': conexao,
+                                'logins_offline': set(cliente['login'] for cliente in clientes),
+                                'logins_restantes': set(cliente['login'] for cliente in clientes),
+                                'timestamp': time.time()
+                            }
+                            eventos_ativos.append(evento)
+                            logging.info(f"Criado novo evento {evento['id']} para conexão {conexao} com {len(clientes)} logins offline.")
+                            enviar_alerta_telegram(clientes, status='offline', conexao=conexao)
+                        else:
+                            logging.info(f"Número de novos clientes offline na conexão {conexao} ({len(clientes)}) abaixo do limite de alerta.")
                 else:
                     logging.info("Nenhum novo cliente offline detectado.")
 
+                # Processar clientes que reconectaram
                 if clientes_reconectados:
                     logging.info(f"Detectados {len(clientes_reconectados)} clientes que voltaram a ficar online.")
-                    clientes_reconectados_info = [clientes_info_online_atual.get(login, {'login': login}) for login in clientes_reconectados]
-                    enviar_alerta_telegram(clientes_reconectados_info, status='online')
+                    for login in clientes_reconectados:
+                        # Encontrar eventos que incluem este login
+                        eventos_para_remover = []
+                        for evento in eventos_ativos:
+                            if login in evento['logins_restantes']:
+                                evento['logins_restantes'].remove(login)
+                                logging.info(f"Login {login} reconectado no evento {evento['id']}.")
+
+                                # Verificar se todos os logins do evento reconectaram
+                                if not evento['logins_restantes']:
+                                    logging.info(f"Todos os logins do evento {evento['id']} reconectaram.")
+                                    # Enviar alerta
+                                    clientes_evento = [clientes_info_online_atual.get(l, {'login': l}) for l in evento['logins_offline']]
+                                    enviar_alerta_telegram(clientes_evento, status='online', conexao=evento['conexao'])
+                                    eventos_para_remover.append(evento)
+                        # Remover eventos concluídos
+                        for evento in eventos_para_remover:
+                            eventos_ativos.remove(evento)
                 else:
                     logging.info("Nenhum cliente reconectado detectado.")
 
@@ -264,7 +303,7 @@ def monitorar_conexoes():
 
             # Aguarda 5 minutos antes da próxima execução
             logging.info("Aguardando 5 minutos para a próxima verificação.")
-            time.sleep(180)
+            time.sleep(300)
 
     except KeyboardInterrupt:
         logging.info("Interrupção solicitada pelo usuário. Encerrando o monitoramento de conexões.")
