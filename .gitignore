@@ -1,6 +1,6 @@
 # Ambiente Virtual
 venv/
-.env
+*.env
 
 # Arquivos de cache Python
 *.pyc
@@ -16,3 +16,6 @@ __pycache__/
 # Outros arquivos temporários
 *.tmp
 
+# Arquivos de teste
+teste*.py
+web_version/
