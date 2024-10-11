@@ -19,3 +19,4 @@ __pycache__/
 # Arquivos de teste
 teste*.py
 web_version/
+saida_api_debug.json
