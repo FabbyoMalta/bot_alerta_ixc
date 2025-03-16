@@ -21,7 +21,7 @@
 
 #### bash#
 ```
-git clone https://github.com/seu_usuario/seu_repositorio.git
+git clone https://github.com/FabbyoMalta/bot_alerta_ixc
 cd seu_repositorio
 ```
 
